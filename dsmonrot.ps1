@@ -13,12 +13,18 @@
 
 # Path to backup directory
 [String]$backupDir = "Z:\"
-# Keep backup for this amount of months (excluding the current month), -1 for indefinite
+# Keep backup for this amount of months (excluding the current month),
+# -1 for indefinite
 [Int32]$keepMonths = 2
 # Path to Drive Snapshot
 [String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
-# Path to Drive Snapshot log file
-[String]$dsLogFile = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.log"
+# Path to Drive Snapshot log file (specify only the file name if you set
+# $dsLogFileToBackup to $True)
+#[String]$dsLogFile = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.log"
+[String]$dsLogFile = "snapshot.log"
+# Set to $True if you want to put the log file of Drive Snapshot into the same
+# directory as the backup
+[Boolean]$dsLogFileToBackup = $True
 # Disks to backup, see http://www.drivesnapshot.de/en/commandline.htm
 [String]$disksToBackup = "HD1:1"
 # Path to DSMonRot log file
@@ -56,7 +62,7 @@
 
 # End of config
 
-$dsAdditionalArgs = @("--logfile:$dsLogFile", "--UseVSS")
+$dsAdditionalArgs = @("--UseVSS")
 
 # Allow SMTP with SSL and SMTP Auth
 # see: http://petermorrissey.blogspot.de/2013/01/sending-smtp-emails-with-powershell.html
@@ -147,7 +153,9 @@ if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path 
 			exit
 		}
 		
-		$dsArgs = @($disksToBackup, "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
+		$dsLogPath = if($dsLogFileToBackup) { "$backupTargetDiff\$dsLogFile" } else { $dsLogFile }
+		
+		$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
 		Write-Host $dsPath ($dsArgs -join " ")
 		
 		& $dsPath $dsArgs
@@ -174,8 +182,10 @@ else {
 		Write-Host "Creating directory $backupTargetFull"
 		New-Item -ItemType directory -Path $backupTargetFull
 	}
+	
+	$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
 
-	$dsArgs = @($disksToBackup, "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
+	$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
 	Write-Host $dsPath ($dsArgs -join " ")
 	
 	& $dsPath $dsArgs
