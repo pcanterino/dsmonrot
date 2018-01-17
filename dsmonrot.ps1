@@ -46,7 +46,7 @@
 # To address of email notification
 [String]$emailToAddress = "patrick@test.local"
 # Subject of email notification
-[String]$emailSubject = "DSMonRot"
+[String]$emailSubject = "DSMonRot on $env:computername"
 # Mail server
 [String]$emailMailserver = "localhost"
 # SMTP Port
@@ -70,20 +70,22 @@ function Send-Email([String]$body) {
 	Write-Host "Sending email: $emailToAddress, $body"
 	
 	try {
-		$smtp = New-Object System.Net.Mail.SmtpClient($emailMailServer, $emailPort);
+		$smtp = New-Object System.Net.Mail.SmtpClient($emailMailServer, $emailPort)
 
 		$smtp.EnableSSL = $emailSSL
 
 		if($emailAuth) {
-			$smtp.Credentials = New-Object System.Net.NetworkCredential($emailUser, $emailPassword);
+			$smtp.Credentials = New-Object System.Net.NetworkCredential($emailUser, $emailPassword)
 		}
 
-		$smtp.Send($emailFromAddress, $emailToAddress, $emailSubject, $body);
+		$smtp.Send($emailFromAddress, $emailToAddress, $emailSubject, $body)
 	}
 	catch {
 		Write-Host "Could not send email: $_.Exception.Message"
 	}
 }
+
+Write-Host "Started at" (Get-Date -format "yyyy-MM-dd HH:mm:ss")
 
 $errorMessages = @()
 
@@ -111,7 +113,7 @@ if($smbDrive) {
 		$smbConnected = $True
 	}
 	Catch {
-		Write-Host "Could not connect to network drive: $_.Exception.Message"
+		Write-Host "Could not connect to network drive $smbDrive`: $_.Exception.Message"
 		exit
 	}
 }
@@ -161,12 +163,15 @@ if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path 
 		& $dsPath $dsArgs
 		
 		if($LastExitCode -ne 0) {
-			Write-Host "Error code: $LastExitCode"
+			Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+			$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+		}
+		else {
+			$success = $True
 		}
 	}
 	else {
 		Write-Host "Directory $backupTargetDiff already exists!"
-		
 		$errorMessages += "Directory $backupTargetDiff already exists!"
 	}
 }
@@ -191,13 +196,15 @@ else {
 	& $dsPath $dsArgs
 	
 	if($LastExitCode -ne 0) {
-		Write-Host "Error code: $LastExitCode"
+		Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+		$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
 	}
-	
-	$success = $False
+	else {
+		$success = $True
+	}
 }
 
-if($isDiff -eq $False -and $success -eq $True -and $keepMonths -ge 0) {
+if(!$isDiff -and $success -eq $True -and $keepMonths -ge 0) {
 	Write-Host "Rotating"
 	
 	$keepMonthsCount = $keepMonths
@@ -210,8 +217,6 @@ if($isDiff -eq $False -and $success -eq $True -and $keepMonths -ge 0) {
 			$keepMonthsCount--
 		}
 		
-		Write-Host $keepMonthsCount
-		
 		if($keepMonthsCount -eq -1) {
 			Write-Host "Deleting $_"
 			Remove-Item -Recurse -Force $_.FullName
@@ -221,9 +226,18 @@ if($isDiff -eq $False -and $success -eq $True -and $keepMonths -ge 0) {
 
 if($smbConnected) {
 	Write-Host "Disconnecting network drive"
-	Remove-PSDrive $smbDrive
+	
+	try {
+		Remove-PSDrive $smbDrive -ErrorAction Stop
+	}
+	catch {
+		Write-Host "Could not disconnect network drive $smbDrive`: $_.Exception.Message"
+		$errorMessages +=  "Could not disconnect network drive $smbDrive`: $_.Exception.Message"
+	}
 }
 
 if($emailOnError -and $errorMessages.Count -gt 0) {
 	Send-Email ("Error:`n"+($errorMessages -join "`n"))
 }
+
+Write-Host "Ended at" (Get-Date -format "yyyy-MM-dd HH:mm:ss")
