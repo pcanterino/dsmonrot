@@ -3,7 +3,7 @@
 #
 # Author: Patrick Canterino <patrick@patrick-canterino.de>
 # WWW: https://www.patrick-canterino.de/
-#      https://github.com/pcanterino/dsmonrot/
+#      https://github.com/pcanterino/dsmonrot
 # License: 2-Clause BSD License
 #
 # Drive Snapshot is copyright by Tom Ehlert
@@ -95,13 +95,11 @@ if($smbDrive) {
 			$smbCredential = New-Object System.Management.Automation.PSCredential($smbUser, $secSmbPassword)
 
 			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Credential $smbCredential -Persist -ErrorAction Stop
-			#net use "$smbDrive`:" $smbPath $smbPassword /user:$smbUser
 		}
 		else {
 			Write-Host "Without credentials"
 		
 			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Persist -ErrorAction Stop
-			#net use "$smbDrive`:" $smbPath
 		}
 		
 		$smbConnected = $True
@@ -149,7 +147,7 @@ if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path 
 			exit
 		}
 		
-		$dsArgs = @($disksToBackup, "$backupTargetFull\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
+		$dsArgs = @($disksToBackup, "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
 		Write-Host $dsPath ($dsArgs -join " ")
 		
 		& $dsPath $dsArgs
@@ -214,7 +212,6 @@ if($isDiff -eq $False -and $success -eq $True -and $keepMonths -ge 0) {
 if($smbConnected) {
 	Write-Host "Disconnecting network drive"
 	Remove-PSDrive $smbDrive
-	#net use "$smbDrive`:" /delete
 }
 
 if($emailOnError -and $errorMessages.Count -gt 0) {
