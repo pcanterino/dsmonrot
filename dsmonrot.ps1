@@ -16,6 +16,11 @@
 # Keep backup for this amount of months (excluding the current month),
 # -1 for indefinite
 [Int32]$keepMonths = 2
+# Rotate BEFORE the beginning of a full backup (default is after a successful
+# full backup)
+# WARNING: If this option is set to $True and the full backup fails you have
+# NO backup
+$rotateBeforeBackup = $False
 # Path to Drive Snapshot
 [String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
 # Path to Drive Snapshot log file (specify only the file name if you set
@@ -82,6 +87,30 @@ function Send-Email([String]$body) {
 	}
 	catch {
 		Write-Host "Could not send email: $_.Exception.Message"
+	}
+}
+
+function Rotate-Backup {
+	if($keepMonths -lt 0) {
+		return
+	}
+
+	Write-Host "Rotating"
+	
+	$keepMonthsCount = $keepMonths
+	
+	Get-ChildItem $backupDir -Directory | Where-Object {($_.Name -ne $currMonth) -and ($_.Name -match "^\d{4,}-\d{2}$")} | Sort-Object -Descending |
+	Foreach-Object {
+		Write-Host $_ "=>" $_.FullName
+		
+		if($keepMonthsCount -ge 0) {
+			$keepMonthsCount--
+		}
+		
+		if($keepMonthsCount -eq -1) {
+			Write-Host "Deleting $_"
+			Remove-Item -Recurse -Force $_.FullName
+		}
 	}
 }
 
@@ -177,7 +206,7 @@ if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path 
 }
 else {
 	Write-Host "Full backup"
-	
+
 	if(!(Test-Path $backupTarget)) {
 		Write-Host "Creating directory $backupTarget"
 		New-Item -ItemType directory -Path $backupTarget
@@ -186,6 +215,10 @@ else {
 	if(!(Test-Path $backupTargetFull)) {
 		Write-Host "Creating directory $backupTargetFull"
 		New-Item -ItemType directory -Path $backupTargetFull
+	}
+	
+	if($rotateBeforeBackup) {
+		Rotate-Backup
 	}
 	
 	$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
@@ -202,25 +235,9 @@ else {
 	else {
 		$success = $True
 	}
-}
-
-if(!$isDiff -and $success -eq $True -and $keepMonths -ge 0) {
-	Write-Host "Rotating"
 	
-	$keepMonthsCount = $keepMonths
-	
-	Get-ChildItem $backupDir -Directory | Where-Object {($_.Name -ne $currMonth) -and ($_.Name -match "^\d{4,}-\d{2}$")} | Sort-Object -Descending |
-	Foreach-Object {
-		Write-Host $_ "=>" $_.FullName
-		
-		if($keepMonthsCount -ge 0) {
-			$keepMonthsCount--
-		}
-		
-		if($keepMonthsCount -eq -1) {
-			Write-Host "Deleting $_"
-			Remove-Item -Recurse -Force $_.FullName
-		}
+	if($rotateBeforeBackup -eq $False -and $success -eq $True) {
+		Rotate-Backup
 	}
 }
 
