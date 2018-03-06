@@ -120,7 +120,6 @@ Write-Host "Started at $startTime"
 $errorMessages = @()
 
 $smbConnected = $False
-$doBackup = $False
 $success = $False
 $isDiff = $False
 $dsCommand = ""
@@ -179,14 +178,13 @@ if($errorMessages.Count -eq 0) {
 			
 			try {
 				New-Item -ItemType directory -Path $backupTargetDiff -ErrorAction Stop
-				$doBackup = $True
 			}
 			catch {
 				Write-Host "Could not create directory $backupTargetDiff`: $_.Exception.Message"
 				$errorMessages += "Could not create directory $backupTargetDiff`: $_.Exception.Message"
 			}
 			
-			if($doBackup) {
+			if($errorMessages.Count -eq 0) {
 				$dsLogPath = if($dsLogFileToBackup) { "$backupTargetDiff\$dsLogFile" } else { $dsLogFile }
 				
 				$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
@@ -225,46 +223,44 @@ if($errorMessages.Count -eq 0) {
 			}
 		}
 		
-		if(!(Test-Path $backupTargetFull)) {
-			Write-Host "Creating directory $backupTargetFull"
-			
-			try {
-				New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop
-				$doBackup = $True
-			}
-			catch {
-				Write-Host "Could not create directory $backupTargetFull`: $_.Exception.Message"
-				$errorMessages += "Could not create directory $backupTargetFull`: $_.Exception.Message"
-			}
-		}
-		else {
-			$doBackup = $True
-		}
-		
-		if($doBackup) {
-			if($rotateBeforeBackup) {
-				Rotate-Backup
+		if($errorMessages.Count -eq 0) {
+			if(!(Test-Path $backupTargetFull)) {
+				Write-Host "Creating directory $backupTargetFull"
+				
+				try {
+					New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop
+				}
+				catch {
+					Write-Host "Could not create directory $backupTargetFull`: $_.Exception.Message"
+					$errorMessages += "Could not create directory $backupTargetFull`: $_.Exception.Message"
+				}
 			}
 			
-			$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
+			if($errorMessages.Count -eq 0) {
+				if($rotateBeforeBackup) {
+					Rotate-Backup
+				}
+				
+				$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
 
-			$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
-			Write-Host $dsPath ($dsArgs -join " ")
-			
-			$dsCommand = "$dsPath $dsArgs"
-			
-			& $dsPath $dsArgs
-			
-			if($LastExitCode -ne 0) {
-				Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
-				$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
-			}
-			else {
-				$success = $True
-			}
-			
-			if($rotateBeforeBackup -eq $False -and $success -eq $True) {
-				Rotate-Backup
+				$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
+				Write-Host $dsPath ($dsArgs -join " ")
+				
+				$dsCommand = "$dsPath $dsArgs"
+				
+				& $dsPath $dsArgs
+				
+				if($LastExitCode -ne 0) {
+					Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+					$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+				}
+				else {
+					$success = $True
+				}
+				
+				if($rotateBeforeBackup -eq $False -and $success -eq $True) {
+					Rotate-Backup
+				}
 			}
 		}
 	}
@@ -285,6 +281,7 @@ if($smbConnected) {
 if($emailOnError -and $errorMessages.Count -gt 0) {
 	$emailBody  = "This is DSMonRot on $env:computername, started at $startTime.`n"
 	$emailBody += "An error occured while performing a backup. Below are the error messages and some status information.`n`n"
+	$emailBody += "Backup directory:       $backupDir`n"
 	$emailBody += "Differential backup:    $isDiff`n"
 	$emailBody += "Backup successful:      $success`n"
 	$emailBody += "Drive Snapshot command: $dsCommand`n`n"
