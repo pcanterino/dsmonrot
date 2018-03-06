@@ -134,12 +134,12 @@ if($smbDrive) {
 			$secSmbPassword = $smbPassword | ConvertTo-SecureString -asPlainText -Force
 			$smbCredential = New-Object System.Management.Automation.PSCredential($smbUser, $secSmbPassword)
 
-			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Credential $smbCredential -Persist -ErrorAction Stop
+			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Credential $smbCredential -Persist -ErrorAction Stop | Out-Null
 		}
 		else {
 			Write-Host "Without credentials"
 		
-			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Persist -ErrorAction Stop
+			New-PSDrive -Name $smbDrive -PSProvider "FileSystem" -Root $smbPath -Persist -ErrorAction Stop | Out-Null
 		}
 		
 		$smbConnected = $True
@@ -177,7 +177,7 @@ if($errorMessages.Count -eq 0) {
 			Write-Host "Creating directory $backupTargetDiff"
 			
 			try {
-				New-Item -ItemType directory -Path $backupTargetDiff -ErrorAction Stop
+				New-Item -ItemType directory -Path $backupTargetDiff -ErrorAction Stop | Out-Null
 			}
 			catch {
 				Write-Host "Could not create directory $backupTargetDiff`: $_.Exception.Message"
@@ -215,7 +215,7 @@ if($errorMessages.Count -eq 0) {
 			Write-Host "Creating directory $backupTarget"
 			
 			try {
-				New-Item -ItemType directory -Path $backupTarget -ErrorAction Stop
+				New-Item -ItemType directory -Path $backupTarget -ErrorAction Stop | Out-Null
 			}
 			catch {
 				Write-Host "Could not create directory $backupTarget`: $_.Exception.Message"
@@ -228,7 +228,7 @@ if($errorMessages.Count -eq 0) {
 				Write-Host "Creating directory $backupTargetFull"
 				
 				try {
-					New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop
+					New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop | Out-Null
 				}
 				catch {
 					Write-Host "Could not create directory $backupTargetFull`: $_.Exception.Message"
