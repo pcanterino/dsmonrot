@@ -18,8 +18,8 @@
 [Int32]$keepMonths = 2
 # Rotate BEFORE the beginning of a full backup (default is after a successful
 # full backup)
-# WARNING: If this option is set to $True and the full backup fails you have
-# NO backup
+# WARNING: If this option is set to $True and the full backup fails you could
+# have NO backup
 $rotateBeforeBackup = $False
 # Path to Drive Snapshot
 [String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
@@ -122,9 +122,11 @@ $errorMessages = @()
 $smbConnected = $False
 $doBackup = $False
 $success = $False
+$isDiff = $False
+$dsCommand = ""
 
 if($smbDrive) {
-	Try {
+	try {
 		Write-Host "Connecting network drive"
 		
 		if($smbUser -and $smbPassword) {
@@ -143,53 +145,113 @@ if($smbDrive) {
 		
 		$smbConnected = $True
 	}
-	Catch {
+	catch {
 		Write-Host "Could not connect to network drive $smbDrive`: $_.Exception.Message"
-		exit
+		$errorMessages += "Could not connect to network drive $smbDrive`: $_.Exception.Message"
 	}
 }
 
 if(!(Test-Path $backupDir)) {
 	Write-Host "Directory $backupDir does not exist!"
-	exit
+	$errorMessages += "Directory $backupDir does not exist!"
 }
 
-$currMonth = Get-Date -format "yyyy-MM"
-$currDay = Get-Date -format "yyyy-MM-dd"
+if($errorMessages.Count -eq 0) {
+	$currMonth = Get-Date -format "yyyy-MM"
+	$currDay = Get-Date -format "yyyy-MM-dd"
 
-Write-Host $currMonth
+	Write-Host $currMonth
 
-$backupTarget = $backupDir + "\" + $currMonth
-$backupTargetFull = $backupTarget + "\" + "Full"
+	$backupTarget = $backupDir + "\" + $currMonth
+	$backupTargetFull = $backupTarget + "\" + "Full"
 
-$backupTargetDiff = $backupTarget + "\" + "Diff-" + $currDay
+	$backupTargetDiff = $backupTarget + "\" + "Diff-" + $currDay
 
-Write-Host $backupTarget
+	Write-Host $backupTarget
 
-$isDiff = $False
-
-if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path "$backupTargetFull\*.hsh")) {
-	Write-Host "Differential backup"
-	
-	$isDiff = $True
-	
-	if(!(Test-Path $backupTargetDiff)) {
-		Write-Host "Creating directory $backupTargetDiff"
+	if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path "$backupTargetFull\*.hsh")) {
+		Write-Host "Differential backup"
 		
-		try {
-			New-Item -ItemType directory -Path $backupTargetDiff -ErrorAction Stop
-			$doBackup = $True
+		$isDiff = $True
+		
+		if(!(Test-Path $backupTargetDiff)) {
+			Write-Host "Creating directory $backupTargetDiff"
+			
+			try {
+				New-Item -ItemType directory -Path $backupTargetDiff -ErrorAction Stop
+				$doBackup = $True
+			}
+			catch {
+				Write-Host "Could not create directory $backupTargetDiff`: $_.Exception.Message"
+				$errorMessages += "Could not create directory $backupTargetDiff`: $_.Exception.Message"
+			}
+			
+			if($doBackup) {
+				$dsLogPath = if($dsLogFileToBackup) { "$backupTargetDiff\$dsLogFile" } else { $dsLogFile }
+				
+				$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
+				Write-Host $dsPath ($dsArgs -join " ")
+				
+				$dsCommand = "$dsPath $dsArgs"
+				
+				& $dsPath $dsArgs
+				
+				if($LastExitCode -ne 0) {
+					Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+					$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
+				}
+				else {
+					$success = $True
+				}
+			}
 		}
-		catch {
-			Write-Host "Could not create directory $backupTargetDiff`: $_.Exception.Message"
-			$errorMessages += "Could not create directory $backupTargetDiff`: $_.Exception.Message"
+		else {
+			Write-Host "Directory $backupTargetDiff already exists!"
+			$errorMessages += "Directory $backupTargetDiff already exists!"
+		}
+	}
+	else {
+		Write-Host "Full backup"
+
+		if(!(Test-Path $backupTarget)) {
+			Write-Host "Creating directory $backupTarget"
+			
+			try {
+				New-Item -ItemType directory -Path $backupTarget -ErrorAction Stop
+			}
+			catch {
+				Write-Host "Could not create directory $backupTarget`: $_.Exception.Message"
+				$errorMessages += "Could not create directory $backupTarget`: $_.Exception.Message"
+			}
+		}
+		
+		if(!(Test-Path $backupTargetFull)) {
+			Write-Host "Creating directory $backupTargetFull"
+			
+			try {
+				New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop
+				$doBackup = $True
+			}
+			catch {
+				Write-Host "Could not create directory $backupTargetFull`: $_.Exception.Message"
+				$errorMessages += "Could not create directory $backupTargetFull`: $_.Exception.Message"
+			}
+		}
+		else {
+			$doBackup = $True
 		}
 		
 		if($doBackup) {
-			$dsLogPath = if($dsLogFileToBackup) { "$backupTargetDiff\$dsLogFile" } else { $dsLogFile }
+			if($rotateBeforeBackup) {
+				Rotate-Backup
+			}
 			
-			$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetDiff\`$disk.sna", "-h$backupTargetFull\`$disk.hsh") + $dsAdditionalArgs
+			$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
+
+			$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
 			Write-Host $dsPath ($dsArgs -join " ")
+			
+			$dsCommand = "$dsPath $dsArgs"
 			
 			& $dsPath $dsArgs
 			
@@ -200,66 +262,10 @@ if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path 
 			else {
 				$success = $True
 			}
-		}
-	}
-	else {
-		Write-Host "Directory $backupTargetDiff already exists!"
-		$errorMessages += "Directory $backupTargetDiff already exists!"
-	}
-}
-else {
-	Write-Host "Full backup"
-
-	if(!(Test-Path $backupTarget)) {
-		Write-Host "Creating directory $backupTarget"
-		
-		try {
-			New-Item -ItemType directory -Path $backupTarget -ErrorAction Stop
-		}
-		catch {
-			Write-Host "Could not create directory $backupTarget`: $_.Exception.Message"
-			$errorMessages += "Could not create directory $backupTarget`: $_.Exception.Message"
-		}
-	}
-	
-	if(!(Test-Path $backupTargetFull)) {
-		Write-Host "Creating directory $backupTargetFull"
-		
-		try {
-			New-Item -ItemType directory -Path $backupTargetFull -ErrorAction Stop
-			$doBackup = $True
-		}
-		catch {
-			Write-Host "Could not create directory $backupTargetFull`: $_.Exception.Message"
-			$errorMessages += "Could not create directory $backupTargetFull`: $_.Exception.Message"
-		}
-	}
-	else {
-		$doBackup = $True
-	}
-	
-	if($doBackup) {
-		if($rotateBeforeBackup) {
-			Rotate-Backup
-		}
-		
-		$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
-
-		$dsArgs = @($disksToBackup, "--logfile:$dsLogPath", "$backupTargetFull\`$disk.sna") + $dsAdditionalArgs
-		Write-Host $dsPath ($dsArgs -join " ")
-		
-		& $dsPath $dsArgs
-		
-		if($LastExitCode -ne 0) {
-			Write-Host "Drive Snapshot failed to backup! Exit code: $LastExitCode"
-			$errorMessages += "Drive Snapshot failed to backup! Exit code: $LastExitCode"
-		}
-		else {
-			$success = $True
-		}
-		
-		if($rotateBeforeBackup -eq $False -and $success -eq $True) {
-			Rotate-Backup
+			
+			if($rotateBeforeBackup -eq $False -and $success -eq $True) {
+				Rotate-Backup
+			}
 		}
 	}
 }
@@ -279,8 +285,9 @@ if($smbConnected) {
 if($emailOnError -and $errorMessages.Count -gt 0) {
 	$emailBody  = "This is DSMonRot on $env:computername, started at $startTime.`n"
 	$emailBody += "An error occured while performing a backup. Below are the error messages and some status information.`n`n"
-	$emailBody += "Differential backup: $isDiff`n"
-	$emailBody += "Backup successfull:  $success`n`n"
+	$emailBody += "Differential backup:    $isDiff`n"
+	$emailBody += "Backup successful:      $success`n"
+	$emailBody += "Drive Snapshot command: $dsCommand`n`n"
 	$emailBody += ($errorMessages -join "`n")
 
 	Send-Email ($emailBody)
