@@ -36,8 +36,9 @@
 # Every month a new log file is created
 [String]$logDir = "C:\Users\Patrick\Desktop\DSMonRot\log"
 # Keep log files for this amount of months (excluding the current month),
-# 0 for indefinite (currently not available)
-[Int32]$keepLogs = 1
+# 0 or less for indefinite (currently not available)
+# You should set this to at least the same as $keepMonths
+[Int32]$keepLogs = 2
 
 # Map network share to this drive letter, comment out if you don't want to use it
 [String]$smbDrive = "Z"
@@ -227,6 +228,26 @@ function Rotate-Backup {
 	}
 }
 
+function Rotate-Log {
+	if($keepLogs -le 0) {
+		return
+	}
+	
+	$keepLogsCount = $keepLogs
+	
+	Get-ChildItem $logDir -File | Where-Object {($_.Name -ne "$currMonth.log") -and ($_.Name -match "^\d{4,}-\d{2}\.log$")} | Sort-Object -Descending |
+	Foreach-Object {
+		if($keepLogsCount -ge 0) {
+			$keepLogsCount--
+		}
+		
+		if($keepLogsCount -eq -1) {
+			Write-Log "Deleting log file $($_.FullName)" -Path $logFile -Level Info
+			Remove-Item -Force $_.FullName
+		}
+	}
+}
+
 $dsAdditionalArgs = @("--UseVSS")
 
 $errorMessages = @()
@@ -238,7 +259,6 @@ $dsCommand = ""
 
 $currMonth = Get-Date -format "yyyy-MM"
 $currDay = Get-Date -format "yyyy-MM-dd"
-
 
 if(!(Test-Path $logDir)) {
 	try {
@@ -398,6 +418,8 @@ if($errorMessages.Count -eq 0) {
 			$errorMessages +=  "Could not disconnect network drive $smbDrive`: $_.Exception.Message"
 		}
 	}
+	
+	Rotate-Log
 }
 
 if($emailOnError -and $errorMessages.Count -gt 0) {
