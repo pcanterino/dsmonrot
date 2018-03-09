@@ -6,7 +6,7 @@ It's main purpose is to create a full backup at the beginning and then create di
 
 ## Requirements
 
-* PowerShell 4.0
+* PowerShell 4.0 (or higher)
 * [Drive Snapshot](http://www.drivesnapshot.de/) (tested with version 1.45)
 
 ## Basic installation
