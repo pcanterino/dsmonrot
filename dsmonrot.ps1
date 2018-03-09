@@ -12,7 +12,12 @@
 # Config
 
 # Path to backup directory
+# This directory MUST exist, it is not created automatically!
 [String]$backupDir = "Z:\"
+# Disks to backup, see http://www.drivesnapshot.de/en/commandline.htm
+[String]$disksToBackup = "D1:1"
+# Path to Drive Snapshot
+[String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
 # Keep backups for this amount of months (excluding the current month),
 # -1 for indefinite
 [Int32]$keepMonths = 2
@@ -21,8 +26,8 @@
 # WARNING: If this option is set to $True and the full backup fails you could
 # have NO backup
 [Boolean]$rotateBeforeBackup = $False
-# Path to Drive Snapshot
-[String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
+# Set to $True if you want to allow multiple backups for a day
+[Boolean]$multipleDailyBackups = $False
 # Path to Drive Snapshot log file (specify only the file name if you set
 # $dsLogFileToBackup to $True)
 #[String]$dsLogFile = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.log"
@@ -30,13 +35,11 @@
 # Set to $True if you want to put the log file of Drive Snapshot into the same
 # directory as the backup
 [Boolean]$dsLogFileToBackup = $True
-# Disks to backup, see http://www.drivesnapshot.de/en/commandline.htm
-[String]$disksToBackup = "HD1:1"
 # Path to directory where DSMonRot stores the log files
 # Every month a new log file is created
-[String]$logDir = "C:\Users\Patrick\Desktop\DSMonRot\log"
+[String]$logDir = "$PSScriptRoot\log"
 # Keep log files for this amount of months (excluding the current month),
-# 0 or less for indefinite (currently not available)
+# 0 or less for indefinite
 # You should set this to at least the same as $keepMonths
 [Int32]$keepLogs = 2
 
@@ -72,7 +75,6 @@
 
 # End of config
 
-# This function is originally by wasserja at https://gallery.technet.microsoft.com/scriptcenter/Write-Log-PowerShell-999c32d0
 <# 
 .Synopsis 
    Write-Log writes a message to a specified log file with the current time stamp. 
@@ -189,10 +191,11 @@ function Write-Log
     } 
 }
 
-# Allow SMTP with SSL and SMTP Auth
-# see: http://petermorrissey.blogspot.de/2013/01/sending-smtp-emails-with-powershell.html
 function Send-Email([String]$body) {
 	try {
+		# Allow SMTP with SSL and SMTP Auth
+		# see: http://petermorrissey.blogspot.de/2013/01/sending-smtp-emails-with-powershell.html
+	
 		$smtp = New-Object System.Net.Mail.SmtpClient($emailMailServer, $emailPort)
 
 		$smtp.EnableSSL = $emailSSL
@@ -259,7 +262,9 @@ $dsCommand = ""
 
 $currMonth = Get-Date -format "yyyy-MM"
 $currDay = Get-Date -format "yyyy-MM-dd"
+$currTime = Get-Date -format "HH-mm-ss" # no colon because we need this for a directory name
 
+# Check if the directory for the log files exists and create it if necessary
 if(!(Test-Path $logDir)) {
 	try {
 		New-Item -ItemType directory -Path $logDir -ErrorAction Stop | Out-Null
@@ -272,10 +277,12 @@ if(!(Test-Path $logDir)) {
 
 $logFile = "$logDir\$currMonth.log"
 
+# Continue only if the log directory exists or if it was created successfully (no error message added)
 if($errorMessages.Count -eq 0) {
 	$startTime = Get-Date -format "yyyy-MM-dd HH:mm:ss"
 	Write-Log "Started at $startTime" -Path $logFile
 
+	# Connect the network drive if necessary
 	if($smbDrive) {
 		Write-Log "Connecting network drive $smbDrive to $smbPath" -Path $logFile
 
@@ -302,18 +309,29 @@ if($errorMessages.Count -eq 0) {
 		}
 	}
 
+	# Check if the backup directory exists
 	if(!(Test-Path $backupDir)) {
 		Write-Log "Directory $backupDir does not exist!" -Path $logFile -Level Error
 		$errorMessages += "Directory $backupDir does not exist!"
 	}
 
+	# Continue only if no error message was recorded (i.e. backup directory does not exist)
 	if($errorMessages.Count -eq 0) {
+		# Compose the backup target directories
 		$backupTarget = $backupDir + "\" + $currMonth
-		$backupTargetFull = $backupTarget + "\" + "Full"
+		$backupTargetFull = $backupTarget + "\Full"
 
-		$backupTargetDiff = $backupTarget + "\" + "Diff-" + $currDay
+		$backupTargetDiff = $backupTarget + "\Diff-" + $currDay
+		
+		if($multipleDailyBackups) {
+			$backupTargetDiff = $backupTargetDiff + "-" + $currTime
+		}
 
+		# Check if the backup target for this month, the directory for the full backup
+		# and the hash files exists. In this case we do a differential backup.
 		if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path "$backupTargetFull\*.hsh")) {
+			# Do a differential backup
+		
 			Write-Log "Doing a differential backup" -Path $logFile
 			
 			$isDiff = $True
@@ -353,6 +371,8 @@ if($errorMessages.Count -eq 0) {
 			}
 		}
 		else {
+			# Do a full backup
+		
 			Write-Log "Doing a full backup" -Path $logFile
 
 			if(!(Test-Path $backupTarget)) {
@@ -407,6 +427,7 @@ if($errorMessages.Count -eq 0) {
 		}
 	}
 
+	# Disconnect the network drive if necessary
 	if($smbConnected) {
 		Write-Log "Disconnecting network drive" -Path $logFile
 		
@@ -419,9 +440,11 @@ if($errorMessages.Count -eq 0) {
 		}
 	}
 	
+	# Rotate the log files
 	Rotate-Log
 }
 
+# If there was any error message recorded, send a mail if configured
 if($emailOnError -and $errorMessages.Count -gt 0) {
 	$emailBody  = "This is DSMonRot on $env:computername, started at $startTime.`n"
 	$emailBody += "An error occured while performing a backup. Below are the error messages and some status information.`n`n"
@@ -433,7 +456,7 @@ if($emailOnError -and $errorMessages.Count -gt 0) {
 	$emailBody += "Drive Snapshot command: $dsCommand`n`n"
 	$emailBody += ($errorMessages -join "`n")
 
-	Send-Email ($emailBody)
+	Send-Email $emailBody
 }
 
 $endTime = Get-Date -format "yyyy-MM-dd HH:mm:ss"

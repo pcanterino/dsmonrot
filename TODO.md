@@ -8,4 +8,4 @@
 - [x] Rotate log files
 - [x] Suppress output of some commands
 - [ ] Add some comments to the source code
-- [ ] Allow multiple backups for a day
+- [x] Allow multiple backups for a day
