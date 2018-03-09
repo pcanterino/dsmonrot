@@ -15,7 +15,7 @@
 # This directory MUST exist, it is not created automatically!
 [String]$backupDir = "Z:\"
 # Disks to backup, see http://www.drivesnapshot.de/en/commandline.htm
-[String]$disksToBackup = "D1:1"
+[String]$disksToBackup = "HD1:1"
 # Path to Drive Snapshot
 [String]$dsPath = "C:\Users\Patrick\Desktop\DSMonRot\snapshot.exe"
 # Keep backups for this amount of months (excluding the current month),
