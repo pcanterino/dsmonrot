@@ -7,5 +7,6 @@
 - [x] Clean up the messages sent to the console or send them to the debug or error streams (e.g. `Write-Debug` or `Write-Error`)
 - [x] Rotate log files
 - [x] Suppress output of some commands
-- [ ] Add some comments to the source code
 - [x] Allow multiple backups for a day
+- [ ] Add some comments to the source code
+- [ ] Update README
