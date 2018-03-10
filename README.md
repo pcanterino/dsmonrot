@@ -21,9 +21,9 @@ It's main purpose is to create a full backup at the beginning and then create di
     4. Specify the number of months to keep the backups by adjusting ``$keepMonths`` (the current month does not count, so if you set this variable to ``2``, DSMonRot keeps the current month **and** the last two months), set to ``0`` if you only want to keep the current month, set to ``-1`` if you don't want to delete any backup (not recommended)
     5. After adjusting ``$keepMonths``, you should also adjust ``$keepLogs`` to at least the same amount. This variable controls the number of log files, DSMonRot keeps.
     5. If your backup directory is on a SMB share, you have to edit the variables ``$smbDrive``, ``$smbPath``, ``$smbUser`` and ``$smbPassword``
-    6. If you want DSMonRot to send a mail if an error occuris, you have to edit the variables ``$emailOnError``, ``$emailFromAddress``, ``$emailToAddress``, ``$emailSubject``, ``$emailMailserver``, ``$emailPort``, ``$emailSSL``, ``$emailAuth``, ``$emailUser`` and ``$emailPassword``
+    6. If you want DSMonRot to send a mail if an error occurs, you have to edit the variables ``$emailOnError``, ``$emailFromAddress``, ``$emailToAddress``, ``$emailSubject``, ``$emailMailserver``, ``$emailPort``, ``$emailSSL``, ``$emailAuth``, ``$emailUser`` and ``$emailPassword``
     7. If you want to adjust more configuration variables, just have a look at the comments preceeding each variable.
-5. Configure Windows task planner to execute your script
+5. Configure Windows task planner to execute the script
 
 ## Credits
 
