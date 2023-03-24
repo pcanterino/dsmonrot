@@ -42,6 +42,10 @@
 # 0 or less for indefinite
 # You should set this to at least the same as $keepMonths
 [Int32]$keepLogs = 2
+# Comma separated lists of files and directories to exclude from the backup
+# See http://www.drivesnapshot.de/en/commandline.htm
+# Comment out if you don't want to use it
+#[String]$excludedPaths = "Path1,Path2"
 
 # Map network share to this drive letter, comment out if you don't want to use it
 [String]$smbDrive = "Z"
@@ -325,6 +329,11 @@ if($errorMessages.Count -eq 0) {
 		
 		if($multipleDailyBackups) {
 			$backupTargetDiff = $backupTargetDiff + "-" + $currTime
+		}
+
+		# Compose the "exclude" parameter if necessary
+		if($excludedPaths) {
+			$dsAdditionalArgs += "--exclude:" + $excludedPaths
 		}
 
 		# Check if the backup target for this month, the directory for the full backup
