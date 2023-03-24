@@ -8,5 +8,5 @@
 - [x] Rotate log files
 - [x] Suppress output of some commands
 - [x] Allow multiple backups for a day
-- [ ] Add some comments to the source code
-- [ ] Update README
+- [x] Add some comments to the source code
+- [x] Update README
