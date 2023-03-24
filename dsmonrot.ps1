@@ -337,7 +337,7 @@ if($errorMessages.Count -eq 0) {
 		}
 
 		# Check if the backup target for this month, the directory for the full backup
-		# and the hash files exists. In this case we do a differential backup.
+		# and the hash files exist. In that case we do a differential backup.
 		if((Test-Path $backupTarget) -and (Test-Path $backupTargetFull) -and (Test-Path "$backupTargetFull\*.hsh")) {
 			# Do a differential backup
 		
