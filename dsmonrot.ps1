@@ -215,7 +215,7 @@ function Send-Email([String]$body) {
 	}
 }
 
-function Rotate-Backup {
+function Invoke-BackupRotation {
 	if($keepMonths -lt 0) {
 		return
 	}
@@ -235,7 +235,7 @@ function Rotate-Backup {
 	}
 }
 
-function Rotate-Log {
+function Invoke-LogRotation {
 	if($keepLogs -le 0) {
 		return
 	}
@@ -407,7 +407,7 @@ if($errorMessages.Count -eq 0) {
 				
 				if($errorMessages.Count -eq 0) {
 					if($rotateBeforeBackup) {
-						Rotate-Backup
+						Invoke-BackupRotation
 					}
 					
 					$dsLogPath = if($dsLogFileToBackup) { "$backupTargetFull\$dsLogFile" } else { $dsLogFile }
@@ -429,7 +429,7 @@ if($errorMessages.Count -eq 0) {
 					}
 					
 					if($rotateBeforeBackup -eq $False -and $success -eq $True) {
-						Rotate-Backup
+						Invoke-BackupRotation
 					}
 				}
 			}
@@ -450,7 +450,8 @@ if($errorMessages.Count -eq 0) {
 	}
 	
 	# Rotate the log files
-	Rotate-Log
+	Invoke-LogRotation
+
 }
 
 # If there was any error message recorded, send a mail if configured
